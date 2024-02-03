@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "docker_foresight"
+version = "0.1.0"
+description = "A Dockerfile analyzer to improve layer optimization"
+authors = ["Rob Reinold"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+GitPython = "^3.1.41"
+dockerfile = "^3.3.1"
+termgraph = "^0.5.3"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+docker_foresight = 'docker_foresight.cli:main'
