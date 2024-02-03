@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "docker_foresight"
 version = "0.1.0"
-description = "A Dockerfile analyzer to improve layer optimization"
+description = "A Dockerfile static analyzer to improve layer optimization"
 authors = ["Rob Reinold"]
 readme = "README.md"
 
