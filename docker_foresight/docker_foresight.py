@@ -11,7 +11,7 @@ import git
 
 @dataclass(frozen=True)
 class Line:
-    line: int
+    line_num: int
     change_rate: float
 
 @dataclass(frozen=True)
@@ -61,12 +61,11 @@ class DockerForesight():
             return sum(rates)
 
 
-    def analyze(self):
+    def analyze(self)->(Report, dict[int, str]):
         g = git.Git(self.git_root_path)
         dockerfile_parsed = dockerfile.parse_file(str(self.dockerfile_path))
         commands = self.get_supported_commands(dockerfile_parsed)
-
-        all_commands = []
+        dockerfile_by_line = self.get_dockerfile_by_line(dockerfile_parsed)
         report_lines = []
         for c in commands:
             input_files = c.value[0:-1]
@@ -86,7 +85,22 @@ class DockerForesight():
                 stats = FileStats(num_changes=num_changes, days_since_creation=days_since_creation)
                 line_stats.append(stats)
             change_rate = self.consolidate_line_stats(line_stats)
-            line = Line(line=c.start_line, change_rate=change_rate)
+            line = Line(line_num=c.start_line, change_rate=change_rate)
             report_lines.append(line)
         report = Report(lines=report_lines)
-        return report
+        return report, dockerfile_by_line
+
+    @classmethod
+    def render(cls, report:Report, dockerfile_by_line:dict[int, str])->str:
+        lines = []
+        report_by_lines = {line.line_num: line for line in report.lines}
+        for line_num,command in dockerfile_by_line.items():
+            out_line = f"{line_num}: {command}"
+            if line_num in report_by_lines:
+                change_rate = report_by_lines[line_num].change_rate
+                out_line += f" | <--- Change rate of {round(change_rate, 2)}"
+            lines.append(out_line)
+        return "\n".join(lines)
+
+    def get_dockerfile_by_line(cls, commands:list[dockerfile.Command])->dict[int, str]:
+        return {command.start_line: command.original for command in commands}

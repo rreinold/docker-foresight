@@ -15,12 +15,12 @@ def _parse_args():
     return Arguments(file=args.file)
 
 def main():
-    print("ok")
     from docker_foresight.docker_foresight import DockerForesight
     args: Arguments = _parse_args()
-    print(args.file)
     fore = DockerForesight(dockerfile_path=args.file)
-    print(fore.analyze())
+    report, raw = fore.analyze()
+    out = fore.render(report, raw)
+    print(out)
 
 if __name__=="__main__":
     print("abc")
