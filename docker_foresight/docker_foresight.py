@@ -1,8 +1,19 @@
+import datetime
+from dateutil.parser import parse
 import dockerfile
 import pathlib
-
+from dataclasses import dataclass
 import git
 
+@dataclass(frozen=True)
+class Report:
+    @dataclass(frozen=True)
+    class Line:
+        line: int
+        change_rate: float
+    lines: list[Line]
+
+SUPPORTED_COMMANDS = ['COPY']
 
 class DockerForesight():
     def __init__(self, dockerfile_path: pathlib.Path = "Dockerfile", git_root_path:pathlib.Path = ".", build_context:pathlib.Path = None):
@@ -11,24 +22,18 @@ class DockerForesight():
         self.build_context = build_context
         self.git_root_path = git_root_path
 
+    @classmethod
+    def get_supported_commands(cls, dockerfile:list[dockerfile.Command])->list[dockerfile.Command]:
+        return [command for command in dockerfile if command.cmd in SUPPORTED_COMMANDS]
 
     def analyze(self):
         g = git.Git(self.git_root_path)
-        df_parsed = dockerfile.parse_file(self.dockerfile_path)
-        copy_commands = [command for command in df_parsed if command.cmd == 'COPY']
-        import datetime
+        dockerfile_parsed = dockerfile.parse_file(self.dockerfile_path)
+        commands = self.get_supported_commands(dockerfile_parsed)
 
-        loginfo = g.log('--reverse', '--pretty=format:"%ad"', "--date=format:%Y-%m-%d", "pyproject.toml")
-        log_lines = loginfo.split('\n')
-        print(len(log_lines))
-        from dateutil.parser import parse
-        # TODO Match exact format
-        oldest = parse(log_lines[0], fuzzy=True)
-        today = datetime.datetime.now()
-        (today - oldest).days
 
         all_commands = []
-        for c in copy_commands:
+        for c in commands:
             print(c)
             input_files = c.value[0:-1]
             print(input_files)
@@ -36,7 +41,7 @@ class DockerForesight():
             for f in input_files:
                 # TODO Add docker context dir
                 logs = g.log('--reverse', '--pretty=format:"%ad"', "--date=format:%Y-%m-%d", f)
-                log_lines = loginfo.split('\n')
+                log_lines = logs.split('\n')
                 num_changes = len(log_lines)
                 # TODO Remove
                 log_lines[0] = "2023-01-01"
