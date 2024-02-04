@@ -1,19 +1,33 @@
 import datetime
+import logging
+
 from dateutil.parser import parse
 import dockerfile
 import pathlib
 from dataclasses import dataclass
 import git
 
+
+
+@dataclass(frozen=True)
+class Line:
+    line: int
+    change_rate: float
+
 @dataclass(frozen=True)
 class Report:
-    @dataclass(frozen=True)
-    class Line:
-        line: int
-        change_rate: float
     lines: list[Line]
 
+@dataclass(frozen=True)
+class FileStats:
+    num_changes:int = 0
+    days_since_creation:int = 0
+
+
+
 SUPPORTED_COMMANDS = ['COPY']
+
+logger = logging.getLogger(__name__)
 
 class DockerForesight():
     def __init__(self, dockerfile_path: pathlib.Path = "Dockerfile", git_root_path:pathlib.Path = ".", build_context:pathlib.Path = None):
@@ -26,36 +40,53 @@ class DockerForesight():
     def get_supported_commands(cls, dockerfile:list[dockerfile.Command])->list[dockerfile.Command]:
         return [command for command in dockerfile if command.cmd in SUPPORTED_COMMANDS]
 
+
+    @classmethod
+    def calculate_rate(cls, stat:FileStats)->float:
+        if not stat.days_since_creation or not stat.num_changes:
+            return 0.0
+        rate_per_month = (stat.num_changes / stat.days_since_creation) * 30
+        return rate_per_month
+
+    @classmethod
+    def consolidate_line_stats(cls, stats: list[FileStats])->float:
+        if len(stats) == 0:
+            logger.error("Found invalid stats")
+            return 0.0
+        if len(stats) == 1:
+            return cls.calculate_rate(stats[0])
+        for s in stats:
+            rates = [cls.calculate_rate(s) for s in stats]
+            # assume no common commits
+            return sum(rates)
+
+
     def analyze(self):
         g = git.Git(self.git_root_path)
         dockerfile_parsed = dockerfile.parse_file(self.dockerfile_path)
         commands = self.get_supported_commands(dockerfile_parsed)
 
-
         all_commands = []
+        report_lines = []
         for c in commands:
-            print(c)
             input_files = c.value[0:-1]
-            print(input_files)
-            rate_of_change = []
+            line_stats = []
             for f in input_files:
+                # TODO consider common commits
                 # TODO Add docker context dir
                 logs = g.log('--reverse', '--pretty=format:"%ad"', "--date=format:%Y-%m-%d", f)
                 log_lines = logs.split('\n')
                 num_changes = len(log_lines)
                 # TODO Remove
                 log_lines[0] = "2023-01-01"
+                # Oldest is first commit
                 creation_date = parse(log_lines[0], fuzzy=True)
-                print(creation_date)
                 days_since_creation = (datetime.datetime.now() - creation_date).days
-                print("days old: ", days_since_creation)
-                if not days_since_creation:
-                    rate_of_change.append(0)
-                    continue
                 # support for months?
-                rate_per_month = (num_changes / days_since_creation) * 30
-                rate_of_change.append(rate_per_month)
-
-            print(rate_of_change)
-            all_commands.append(rate_of_change)
-        return all_commands
+                stats = FileStats(num_changes=num_changes, days_since_creation=days_since_creation)
+                line_stats.append(stats)
+            change_rate = self.consolidate_line_stats(line_stats)
+            line = Line(line=c.start_line, change_rate=change_rate)
+            report_lines.append(line)
+        report = Report(lines=report_lines)
+        return report
