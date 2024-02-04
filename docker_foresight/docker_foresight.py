@@ -17,6 +17,7 @@ class Line:
 @dataclass(frozen=True)
 class Report:
     lines: list[Line]
+    score: float
 
 @dataclass(frozen=True)
 class FileStats:
@@ -45,7 +46,7 @@ class DockerForesight():
     def calculate_rate(cls, stat:FileStats)->float:
         if not stat.days_since_creation or not stat.num_changes:
             return 0.0
-        rate_per_month = (stat.num_changes / stat.days_since_creation) * 30
+        rate_per_month = (stat.num_changes / stat.days_since_creation) * 365
         return rate_per_month
 
     @classmethod
@@ -87,12 +88,13 @@ class DockerForesight():
             change_rate = self.consolidate_line_stats(line_stats)
             line = Line(line_num=c.start_line, change_rate=change_rate)
             report_lines.append(line)
-        report = Report(lines=report_lines)
+        score = self.calculate_score(report_lines, len(dockerfile_parsed))
+        report = Report(lines=report_lines, score=score)
         return report, dockerfile_by_line
 
     @classmethod
     def render(cls, report:Report, dockerfile_by_line:dict[int, str])->str:
-        lines = []
+        lines = [f"Score: {round(report.score,2)}"]
         report_by_lines = {line.line_num: line for line in report.lines}
         for line_num,command in dockerfile_by_line.items():
             out_line = f"{line_num}: {command}"
@@ -102,5 +104,10 @@ class DockerForesight():
             lines.append(out_line)
         return "\n".join(lines)
 
+    @classmethod
     def get_dockerfile_by_line(cls, commands:list[dockerfile.Command])->dict[int, str]:
         return {command.start_line: command.original for command in commands}
+
+    @classmethod
+    def calculate_score(cls, line_stats, num_dockerfile_lines:int):
+        return sum([l.change_rate for l in line_stats])/num_dockerfile_lines * 10
