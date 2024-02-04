@@ -63,7 +63,7 @@ class DockerForesight():
 
     def analyze(self):
         g = git.Git(self.git_root_path)
-        dockerfile_parsed = dockerfile.parse_file(self.dockerfile_path)
+        dockerfile_parsed = dockerfile.parse_file(str(self.dockerfile_path))
         commands = self.get_supported_commands(dockerfile_parsed)
 
         all_commands = []

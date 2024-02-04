@@ -20,6 +20,7 @@ def main():
     args: Arguments = _parse_args()
     print(args.file)
     fore = DockerForesight(dockerfile_path=args.file)
+    print(fore.analyze())
 
 if __name__=="__main__":
     print("abc")
