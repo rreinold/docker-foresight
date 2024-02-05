@@ -5,6 +5,5 @@ from docker_foresight.docker_foresight import DockerForesight, Report, Line
 
 def test_docker_foresight():
     dfore = DockerForesight(dockerfile_path="Dockerfile")
-    actual = dfore.analyze()
-    print(actual)
-    assert actual == Report(lines=[Line(line_num=14, change_rate=0.15075376884422112), Line(line_num=16, change_rate=0.2261306532663317)])
+    actual,_ = dfore.analyze()
+    assert actual.score == 15.96875

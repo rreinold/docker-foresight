@@ -1,5 +1,6 @@
 import datetime
 import logging
+from enum import Enum
 
 from dateutil.parser import parse
 import dockerfile
@@ -7,12 +8,23 @@ import pathlib
 from dataclasses import dataclass
 import git
 
-
+class Risk(str,Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
 
 @dataclass(frozen=True)
 class Line:
     line_num: int
     change_rate: float
+
+    @property
+    def risk(self)->Risk:
+        if self.change_rate < 4:
+            return Risk.LOW
+        if self.change_rate < 6:
+            return Risk.MEDIUM
+        return Risk.HIGH
 
 @dataclass(frozen=True)
 class Report:
@@ -81,6 +93,9 @@ class DockerForesight():
                 log_lines[0] = "2023-01-01"
                 # Oldest is first commit
                 creation_date = parse(log_lines[0], fuzzy=True)
+                # Should it be:
+                #   1) file commits per unit of time (current impl)
+                #   2) file commits per total commits
                 days_since_creation = (datetime.datetime.now() - creation_date).days
                 # support for months?
                 stats = FileStats(num_changes=num_changes, days_since_creation=days_since_creation)
@@ -97,10 +112,11 @@ class DockerForesight():
         lines = [f"Score: {round(report.score,2)}"]
         report_by_lines = {line.line_num: line for line in report.lines}
         for line_num,command in dockerfile_by_line.items():
-            out_line = f"{line_num}: {command}"
+            risk_fmted = "".ljust(8)
             if line_num in report_by_lines:
-                change_rate = report_by_lines[line_num].change_rate
-                out_line += f" | <--- Change rate of {round(change_rate, 2)}"
+                risk = report_by_lines[line_num].risk
+                risk_fmted = risk.ljust(8)
+            out_line = f"{risk_fmted}{(str(line_num)).ljust(4)}: {command}"
             lines.append(out_line)
         return "\n".join(lines)
 
